@@ -1,3 +1,19 @@
 spring:
   application:
     name: project_checklist
+
+  # TODO: 팀에서 DB 스키마명/계정 확정되면 아래 값 교체 (요구사항정의서 프로젝트명: Planit)
+  datasource:
+    url: jdbc:mysql://localhost:3306/planit?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update   # 개발 초기 단계용. 스키마 안정화되면 validate 로 전환 권장
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
