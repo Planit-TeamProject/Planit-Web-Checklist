@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,6 +30,11 @@ import lombok.NoArgsConstructor;
  * 완료 여부는 boolean 이 아니라 0/25/50/75/100 다섯 단계의 진행률(progress_rate)로 관리합니다.
  * "오늘 진행률"(당일 전체 진행률)은 별도 컬럼으로 저장하지 않고, 조회 시점에 그날 항목들의
  * progress_rate 단순 평균으로 계산합니다 (StudyPlanItemService 참고).
+ *
+ * 화면 목업 기준 항목별 시간대 표시(예: "09:00 – 10:30", "저녁 · 30분")를 위해
+ * startTime/endTime/durationMinutes 를 추가했습니다. 시간이 고정된 항목은
+ * startTime/endTime 을 사용하고, 시간이 고정되지 않은 항목(자동 추가된 복습 등)은
+ * durationMinutes 만 채우고 startTime/endTime 은 NULL 로 둡니다.
  */
 @Entity
 @Table(
@@ -59,6 +65,18 @@ public class StudyPlanItem extends BaseTimeEntity {
     @Column(name = "content", length = 255, nullable = false)
     private String content;
 
+    /** 계획된 시작 시각. 시간대가 정해지지 않은 항목은 NULL. */
+    @Column(name = "start_time")
+    private LocalTime startTime;
+
+    /** 계획된 종료 시각. startTime 과 함께 사용, NULL 가능. */
+    @Column(name = "end_time")
+    private LocalTime endTime;
+
+    /** startTime/endTime 이 없을 때 화면에 보여줄 예상 소요 시간(분). */
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
@@ -70,11 +88,15 @@ public class StudyPlanItem extends BaseTimeEntity {
     private LocalDateTime completedAt;
 
     @Builder
-    public StudyPlanItem(StudyPlan studyPlan, LocalDate planDate, String subject, String content, int sortOrder) {
+    public StudyPlanItem(StudyPlan studyPlan, LocalDate planDate, String subject, String content,
+                          LocalTime startTime, LocalTime endTime, Integer durationMinutes, int sortOrder) {
         this.studyPlan = studyPlan;
         this.planDate = planDate;
         this.subject = subject;
         this.content = content;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.durationMinutes = durationMinutes;
         this.sortOrder = sortOrder;
         this.progressRate = 0;
     }
