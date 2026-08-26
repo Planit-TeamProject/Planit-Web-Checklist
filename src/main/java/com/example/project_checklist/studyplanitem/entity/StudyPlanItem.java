@@ -21,10 +21,14 @@ import lombok.NoArgsConstructor;
 
 /**
  * 04_ERD_테이블정의서 - study_plan_item(학습 계획 항목) 매핑.
- * 담당 요구사항: REQ-F-001~005 (오늘의 학습 계획 조회/체크), REQ-NF-001~004.
+ * 담당 요구사항: REQ-F-050~054 (오늘의 학습 계획 조회/체크), REQ-NF-001~004.
  *
  * 회원 정보는 study_plan 을 통해서만 참조하고 이 테이블에는 따로 저장하지 않습니다
  * (공통 설계 규칙 - 계산/중복 저장 금지 원칙).
+ *
+ * 완료 여부는 boolean 이 아니라 0/25/50/75/100 다섯 단계의 진행률(progress_rate)로 관리합니다.
+ * "오늘 진행률"(당일 전체 진행률)은 별도 컬럼으로 저장하지 않고, 조회 시점에 그날 항목들의
+ * progress_rate 단순 평균으로 계산합니다 (StudyPlanItemService 참고).
  */
 @Entity
 @Table(
@@ -58,8 +62,9 @@ public class StudyPlanItem extends BaseTimeEntity {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
-    @Column(name = "is_completed", nullable = false)
-    private boolean completed;
+    /** 0, 25, 50, 75, 100 중 하나. 100이면 완료로 간주합니다. */
+    @Column(name = "progress_rate", nullable = false)
+    private int progressRate;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
@@ -71,21 +76,21 @@ public class StudyPlanItem extends BaseTimeEntity {
         this.subject = subject;
         this.content = content;
         this.sortOrder = sortOrder;
-        this.completed = false;
+        this.progressRate = 0;
     }
 
     /**
-     * REQ-F-003, REQ-F-004: 완료/미완료 체크. 완료로 바뀔 때만 완료 일시를 기록하고,
-     * 다시 미완료로 되돌리면 완료 일시를 비웁니다.
+     * REQ-F-050~054: 학습 진행률 체크. progressRate 가 100이 되는 순간 완료 일시를 기록하고,
+     * 100 미만으로 다시 바뀌면 완료 일시를 비웁니다.
+     * 값 검증(0/25/50/75/100 인지)은 서비스 계층에서 먼저 확인한 뒤 호출합니다.
      */
-    public void toggleCompleted() {
-        if (this.completed) {
-            this.completed = false;
-            this.completedAt = null;
-        } else {
-            this.completed = true;
-            this.completedAt = LocalDateTime.now();
-        }
+    public void updateProgress(int progressRate) {
+        this.progressRate = progressRate;
+        this.completedAt = (progressRate == 100) ? LocalDateTime.now() : null;
+    }
+
+    public boolean isCompleted() {
+        return this.progressRate == 100;
     }
 
     /** 본인 소유 확인(REQ-NF-003 관련)용 — study_plan 을 거쳐 회원 id 를 얻습니다. */

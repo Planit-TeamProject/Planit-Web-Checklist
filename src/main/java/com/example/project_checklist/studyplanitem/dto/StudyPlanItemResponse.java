@@ -15,6 +15,7 @@ public class StudyPlanItemResponse {
     private String content;
     private LocalDate planDate;
     private int sortOrder;
+    private int progressRate;
     private boolean completed;
     private LocalDateTime completedAt;
 
@@ -25,6 +26,7 @@ public class StudyPlanItemResponse {
                 .content(item.getContent())
                 .planDate(item.getPlanDate())
                 .sortOrder(item.getSortOrder())
+                .progressRate(item.getProgressRate())
                 .completed(item.isCompleted())
                 .completedAt(item.getCompletedAt())
                 .build();

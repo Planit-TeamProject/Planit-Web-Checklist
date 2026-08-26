@@ -8,9 +8,11 @@ import com.example.project_checklist.global.exception.CustomException;
 import com.example.project_checklist.member.entity.Member;
 import com.example.project_checklist.studyplan.entity.StudyPlan;
 import com.example.project_checklist.studyplanitem.dto.StudyPlanItemResponse;
+import com.example.project_checklist.studyplanitem.dto.TodayPlanResponse;
 import com.example.project_checklist.studyplanitem.entity.StudyPlanItem;
 import com.example.project_checklist.studyplanitem.repository.StudyPlanItemRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,7 @@ class StudyPlanItemServiceTest {
 
     private StudyPlanItemService studyPlanItemService;
 
-    private StudyPlanItem itemOf(Long ownerId, Long id) {
+    private StudyPlanItem itemOf(Long ownerId, Long id, int progressRate) {
         Member member = new Member();
         ReflectionTestUtils.setField(member, "id", ownerId);
 
@@ -42,42 +44,80 @@ class StudyPlanItemServiceTest {
                 .sortOrder(1)
                 .build();
         ReflectionTestUtils.setField(item, "id", id);
+        ReflectionTestUtils.setField(item, "progressRate", progressRate);
         return item;
     }
 
     @Test
-    void 오늘의_계획을_조회하면_회원과_날짜로_필터링된_리스트가_반환된다() {
+    void 오늘의_계획을_조회하면_항목_리스트와_함께_진행률_평균이_반환된다() {
         studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
         LocalDate today = LocalDate.now();
         given(studyPlanItemRepository.findByMemberIdAndPlanDate(1L, today))
-                .willReturn(List.of(itemOf(1L, 100L)));
+                .willReturn(List.of(
+                        itemOf(1L, 100L, 100),
+                        itemOf(1L, 101L, 50),
+                        itemOf(1L, 102L, 0),
+                        itemOf(1L, 103L, 75)));
 
-        List<StudyPlanItemResponse> result = studyPlanItemService.getPlanItems(1L, today);
+        TodayPlanResponse result = studyPlanItemService.getTodayPlan(1L, today);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(100L);
+        assertThat(result.getItems()).hasSize(4);
+        assertThat(result.getTodayProgressRate()).isEqualTo(56); // (100+50+0+75)/4 = 56.25 -> 반올림 56
     }
 
     @Test
-    void 미완료_항목을_체크하면_완료로_바뀌고_완료일시가_기록된다() {
+    void 항목이_없으면_오늘_진행률은_0이다() {
         studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
-        StudyPlanItem item = itemOf(1L, 100L);
+        LocalDate today = LocalDate.now();
+        given(studyPlanItemRepository.findByMemberIdAndPlanDate(1L, today)).willReturn(List.of());
+
+        TodayPlanResponse result = studyPlanItemService.getTodayPlan(1L, today);
+
+        assertThat(result.getTodayProgressRate()).isEqualTo(0);
+    }
+
+    @Test
+    void 진행률을_100으로_체크하면_완료일시가_기록된다() {
+        studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
+        StudyPlanItem item = itemOf(1L, 100L, 0);
         given(studyPlanItemRepository.findById(100L)).willReturn(Optional.of(item));
 
-        StudyPlanItemResponse result = studyPlanItemService.toggleCheck(1L, 100L);
+        StudyPlanItemResponse result = studyPlanItemService.updateProgress(1L, 100L, 100);
 
+        assertThat(result.getProgressRate()).isEqualTo(100);
         assertThat(result.isCompleted()).isTrue();
         assertThat(result.getCompletedAt()).isNotNull();
     }
 
     @Test
+    void 완료된_항목의_진행률을_다시_낮추면_완료일시가_비워진다() {
+        studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
+        StudyPlanItem item = itemOf(1L, 100L, 100);
+        ReflectionTestUtils.setField(item, "completedAt", LocalDateTime.now());
+        given(studyPlanItemRepository.findById(100L)).willReturn(Optional.of(item));
+
+        StudyPlanItemResponse result = studyPlanItemService.updateProgress(1L, 100L, 50);
+
+        assertThat(result.getProgressRate()).isEqualTo(50);
+        assertThat(result.getCompletedAt()).isNull();
+    }
+
+    @Test
+    void 허용되지_않는_진행률_값이면_예외가_발생한다() {
+        studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
+
+        assertThatThrownBy(() -> studyPlanItemService.updateProgress(1L, 100L, 30))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
     void 본인_소유가_아닌_항목을_체크하면_예외가_발생한다() {
         studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository);
-        StudyPlanItem item = itemOf(2L, 100L); // 소유자는 memberId=2
+        StudyPlanItem item = itemOf(2L, 100L, 0); // 소유자는 memberId=2
 
         given(studyPlanItemRepository.findById(100L)).willReturn(Optional.of(item));
 
-        assertThatThrownBy(() -> studyPlanItemService.toggleCheck(1L, 100L))
+        assertThatThrownBy(() -> studyPlanItemService.updateProgress(1L, 100L, 50))
                 .isInstanceOf(CustomException.class);
     }
 }
