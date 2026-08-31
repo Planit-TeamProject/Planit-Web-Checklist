@@ -52,7 +52,8 @@ public class StudyPlanItemController {
 
     /**
      * REQ-F-050~054: POST /api/study-plan-items/complete-day?memberId=1&date=2026-08-25
-     * "오늘 학습 마무리하기" 버튼. 그날 항목이 전부 100%가 아니면 400 에러를 반환합니다.
+     * "오늘 학습 마무리하기" 버튼. 그날 항목을 전부 100%로 체크하지 못했더라도 마무리할 수 있습니다.
+     * 다만 그날 등록된 항목이 하나도 없으면 400 에러를 반환합니다.
      */
     @PostMapping("/complete-day")
     public ResponseEntity<DayCompletionResponse> completeDay(

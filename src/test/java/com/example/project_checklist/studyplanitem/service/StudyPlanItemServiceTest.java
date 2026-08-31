@@ -157,15 +157,21 @@ class StudyPlanItemServiceTest {
     }
 
     @Test
-    void 항목중_하나라도_100퍼센트가_아니면_마무리_요청은_예외가_발생한다() {
+    void 일부_항목만_완료했어도_오늘_학습_마무리가_기록된다() {
         studyPlanItemService = new StudyPlanItemService(studyPlanItemRepository, studyDayCompletionRepository);
         StudyPlan studyPlan = studyPlanOf(1L, 10L);
         LocalDate today = LocalDate.now();
         given(studyPlanItemRepository.findByMemberIdAndPlanDate(1L, today))
-                .willReturn(List.of(itemOf(studyPlan, 100L, 100), itemOf(studyPlan, 101L, 75)));
+                .willReturn(List.of(itemOf(studyPlan, 100L, 100), itemOf(studyPlan, 101L, 25), itemOf(studyPlan, 102L, 0)));
+        given(studyDayCompletionRepository.findByStudyPlanIdAndPlanDate(10L, today))
+                .willReturn(Optional.empty());
+        given(studyDayCompletionRepository.save(any(StudyDayCompletion.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> studyPlanItemService.completeToday(1L, today))
-                .isInstanceOf(CustomException.class);
+        DayCompletionResponse result = studyPlanItemService.completeToday(1L, today);
+
+        assertThat(result.isCompleted()).isTrue();
+        assertThat(result.getCompletedAt()).isNotNull();
     }
 
     @Test

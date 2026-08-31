@@ -70,7 +70,8 @@ public class StudyPlanItemService {
     }
 
     /**
-     * "오늘 학습 마무리하기": 그날 항목이 하나 이상 있고 전부 100%일 때만 완료 기록을 남깁니다.
+     * "오늘 학습 마무리하기": 그날 항목이 하나 이상 등록돼 있으면, 전부 100%가 아니어도
+     * (부득이하게 일부만 했더라도) 완료 기록을 남길 수 있습니다.
      * 이미 완료 기록이 있으면 새로 만들지 않고 기존 기록을 그대로 반환합니다(하루 1회).
      */
     @Transactional
@@ -78,9 +79,8 @@ public class StudyPlanItemService {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
         List<StudyPlanItem> items = studyPlanItemRepository.findByMemberIdAndPlanDate(memberId, targetDate);
 
-        boolean allCompleted = !items.isEmpty() && items.stream().allMatch(StudyPlanItem::isCompleted);
-        if (!allCompleted) {
-            throw new CustomException(ErrorCode.STUDY_PLAN_NOT_ALL_COMPLETED);
+        if (items.isEmpty()) {
+            throw new CustomException(ErrorCode.STUDY_PLAN_ITEMS_EMPTY_FOR_DATE);
         }
 
         Long studyPlanId = items.get(0).getStudyPlan().getId();
