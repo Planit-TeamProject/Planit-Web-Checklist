@@ -1,26 +1,12 @@
 package com.example.project_checklist.member.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.Getter;
-
-/**
- * 임시 최소 버전입니다.
+/*
+ * REMOVED: MySQL/JPA -> Firestore 전환하면서 더 이상 쓰지 않습니다.
+ * study_plan_item 이 회원을 참조할 때 이 스텁 엔티티와의 JPA 연관관계(@ManyToOne) 대신
+ * memberId(Long) 값을 문서에 직접 저장하는 방식으로 바뀌었습니다
+ * (StudyPlanItem.java, StudyPlanItemRepository.java 참고).
  *
- * 회원 도메인(회원가입/로그인 담당)의 실제 Member 엔티티로 교체될 예정입니다.
- * study_plan_item 조회/체크 기능을 독립적으로 개발·테스트하려면 study_plan -> member
- * 연관관계가 컴파일되어야 해서, id 만 있는 최소 버전으로 우선 만들어 둡니다.
- * 실제 Member 엔티티가 머지되면 이 파일은 삭제하고 import 경로만 그쪽으로 맞추면 됩니다.
+ * 이 세션 환경에서는 파일을 완전히 삭제할 권한이 없어서 내용만 비워뒀습니다.
+ * 프로젝트에서 이 파일(Member.java) 자체를 지우셔도 됩니다. (실제 회원 도메인은
+ * 다른 팀원이 별도로 Firestore "members" 컬렉션 등으로 설계할 예정입니다.)
  */
-@Entity
-@Table(name = "member")
-@Getter
-public class Member {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-}

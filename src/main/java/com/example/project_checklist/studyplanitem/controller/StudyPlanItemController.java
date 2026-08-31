@@ -41,18 +41,23 @@ public class StudyPlanItemController {
     /**
      * REQ-F-050~054: PATCH /api/study-plan-items/{id}/progress?memberId=1&progressRate=75
      * progressRate 는 0/25/50/75/100 중 하나만 허용됩니다. 클릭 즉시 반영되고 결과를 바로 반환합니다.
+     *
+     * [MySQL/JPA -> Firestore 전환 메모] {id} 가 더 이상 숫자가 아니라 Firestore 문서 id
+     * (영문/숫자 섞인 문자열, 예: "aB3xY9Zq...")입니다. curl로 테스트할 때 GET 응답에 찍힌
+     * items[].id 값을 그대로 복사해서 넣으면 됩니다.
      */
     @PatchMapping("/{id}/progress")
     public ResponseEntity<StudyPlanItemResponse> updateProgress(
             @RequestParam Long memberId,
-            @PathVariable("id") Long itemId,
+            @PathVariable("id") String itemId,
             @RequestParam int progressRate) {
         return ResponseEntity.ok(studyPlanItemService.updateProgress(memberId, itemId, progressRate));
     }
 
     /**
      * REQ-F-050~054: POST /api/study-plan-items/complete-day?memberId=1&date=2026-08-25
-     * "오늘 학습 마무리하기" 버튼. 그날 항목이 전부 100%가 아니면 400 에러를 반환합니다.
+     * "오늘 학습 마무리하기" 버튼. 그날 항목을 전부 100%로 체크하지 못했더라도 마무리할 수 있습니다.
+     * 다만 그날 등록된 항목이 하나도 없으면 400 에러를 반환합니다.
      */
     @PostMapping("/complete-day")
     public ResponseEntity<DayCompletionResponse> completeDay(

@@ -9,16 +9,23 @@ import com.example.project_checklist.studyplanitem.entity.StudyDayCompletion;
 import com.example.project_checklist.studyplanitem.entity.StudyPlanItem;
 import com.example.project_checklist.studyplanitem.repository.StudyDayCompletionRepository;
 import com.example.project_checklist.studyplanitem.repository.StudyPlanItemRepository;
+import com.google.cloud.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * [MySQL/JPA -> Firestore 전환 메모] Firestore는 Spring의 @Transactional(JPA/DataSource 기반)로
+ * 묶이지 않으므로 트랜잭션 애노테이션을 제거했습니다. 이 서비스가 하는 각 쓰기(진행률 체크,
+ * 완료 기록 저장)는 문서 하나 단위라 별도 트랜잭션 없이도 안전합니다.
+ */
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class StudyPlanItemService {
 
     private static final Set<Integer> ALLOWED_PROGRESS_RATES = Set.of(0, 25, 50, 75, 100);
@@ -37,14 +44,14 @@ public class StudyPlanItemService {
         StudyDayCompletion completion = items.isEmpty()
                 ? null
                 : studyDayCompletionRepository
-                        .findByStudyPlanIdAndPlanDate(items.get(0).getStudyPlan().getId(), targetDate)
+                        .findByStudyPlanIdAndPlanDate(items.get(0).getStudyPlanId(), targetDate)
                         .orElse(null);
 
         return TodayPlanResponse.builder()
                 .date(targetDate)
                 .todayProgressRate(calculateAverageProgress(items))
                 .dayCompleted(completion != null)
-                .dayCompletedAt(completion != null ? completion.getCreatedAt() : null)
+                .dayCompletedAt(completion != null ? toLocalDateTime(completion.getCreatedAt()) : null)
                 .items(items.stream().map(StudyPlanItemResponse::from).toList())
                 .build();
     }
@@ -52,8 +59,7 @@ public class StudyPlanItemService {
     /**
      * REQ-F-050~054: 항목별 진행률 체크(0/25/50/75/100). 본인 소유 항목이 아니면 거부합니다.
      */
-    @Transactional
-    public StudyPlanItemResponse updateProgress(Long memberId, Long itemId, int progressRate) {
+    public StudyPlanItemResponse updateProgress(Long memberId, String itemId, int progressRate) {
         if (!ALLOWED_PROGRESS_RATES.contains(progressRate)) {
             throw new CustomException(ErrorCode.INVALID_PROGRESS_RATE);
         }
@@ -66,36 +72,36 @@ public class StudyPlanItemService {
         }
 
         item.updateProgress(progressRate);
+        studyPlanItemRepository.save(item);
         return StudyPlanItemResponse.from(item);
     }
 
     /**
-     * "오늘 학습 마무리하기": 그날 항목이 하나 이상 있고 전부 100%일 때만 완료 기록을 남깁니다.
+     * "오늘 학습 마무리하기": 그날 항목이 하나 이상 등록돼 있으면, 전부 100%가 아니어도
+     * (부득이하게 일부만 했더라도) 완료 기록을 남길 수 있습니다.
      * 이미 완료 기록이 있으면 새로 만들지 않고 기존 기록을 그대로 반환합니다(하루 1회).
      */
-    @Transactional
     public DayCompletionResponse completeToday(Long memberId, LocalDate date) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
         List<StudyPlanItem> items = studyPlanItemRepository.findByMemberIdAndPlanDate(memberId, targetDate);
 
-        boolean allCompleted = !items.isEmpty() && items.stream().allMatch(StudyPlanItem::isCompleted);
-        if (!allCompleted) {
-            throw new CustomException(ErrorCode.STUDY_PLAN_NOT_ALL_COMPLETED);
+        if (items.isEmpty()) {
+            throw new CustomException(ErrorCode.STUDY_PLAN_ITEMS_EMPTY_FOR_DATE);
         }
 
-        Long studyPlanId = items.get(0).getStudyPlan().getId();
+        String studyPlanId = items.get(0).getStudyPlanId();
         StudyDayCompletion completion = studyDayCompletionRepository
                 .findByStudyPlanIdAndPlanDate(studyPlanId, targetDate)
                 .orElseGet(() -> studyDayCompletionRepository.save(
                         StudyDayCompletion.builder()
-                                .studyPlan(items.get(0).getStudyPlan())
-                                .planDate(targetDate)
+                                .studyPlanId(studyPlanId)
+                                .planDate(targetDate.toString())
                                 .build()));
 
         return DayCompletionResponse.builder()
                 .date(targetDate)
                 .completed(true)
-                .completedAt(completion.getCreatedAt())
+                .completedAt(toLocalDateTime(completion.getCreatedAt()))
                 .build();
     }
 
@@ -108,5 +114,14 @@ public class StudyPlanItemService {
                 .average()
                 .orElse(0);
         return (int) Math.round(average);
+    }
+
+    private LocalDateTime toLocalDateTime(Timestamp timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+        return LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()),
+                ZoneId.systemDefault());
     }
 }
