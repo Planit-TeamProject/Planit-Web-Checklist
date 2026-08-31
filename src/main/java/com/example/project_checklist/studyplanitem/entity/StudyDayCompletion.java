@@ -1,60 +1,35 @@
 package com.example.project_checklist.studyplanitem.entity;
 
-import com.example.project_checklist.global.entity.BaseTimeEntity;
-import com.example.project_checklist.studyplan.entity.StudyPlan;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDate;
-import lombok.AccessLevel;
+import com.google.cloud.Timestamp;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
- * 04_ERD_테이블정의서 - study_day_completion(학습 일일 완료 기록) 매핑.
+ * Firestore "study_day_completions" 컬렉션 문서 매핑.
  *
- * "오늘 학습 마무리하기" 버튼을 눌러서 그 날짜의 학습을 모두 완료 처리했다는 사실을
- * 기록하는 테이블입니다. study_plan_id + plan_date 조합은 유일하며(하루 1회만 기록),
- * 이미 기록이 있으면 새로 만들지 않고 기존 기록을 그대로 반환합니다
- * (StudyPlanItemService#completeToday 참고).
+ * "오늘 학습 마무리하기" 버튼을 눌러서 그 날짜의 학습을 완료 처리했다는 사실을 기록하는
+ * 컬렉션입니다. 문서 id를 "{studyPlanId}_{planDate}" 형태로 고정해서, study_plan_id +
+ * plan_date 조합이 자연스럽게 유일해지도록(하루 1회만 기록) 설계했습니다
+ * (StudyDayCompletionRepository#docId 참고). 이미 기록이 있으면 새로 만들지 않고
+ * 기존 기록을 그대로 반환합니다 (StudyPlanItemService#completeToday 참고).
  *
- * completed_at 은 별도 컬럼을 두지 않고, 상속받는 BaseTimeEntity 의 createdAt
- * (이 행이 생성된 시각 = 완료 처리한 시각)을 그대로 사용합니다.
+ * completedAt 은 별도 필드를 두지 않고 createdAt(이 문서가 생성된 시각 = 완료 처리한 시각)을
+ * 그대로 사용합니다.
  */
-@Entity
-@Table(
-        name = "study_day_completion",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_study_plan_plan_date",
-                columnNames = {"study_plan_id", "plan_date"}
-        )
-)
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StudyDayCompletion extends BaseTimeEntity {
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class StudyDayCompletion {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String studyPlanId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "study_plan_id", nullable = false)
-    private StudyPlan studyPlan;
+    /** "yyyy-MM-dd" 형식의 ISO 날짜 문자열. */
+    private String planDate;
 
-    @Column(name = "plan_date", nullable = false)
-    private LocalDate planDate;
-
-    @Builder
-    public StudyDayCompletion(StudyPlan studyPlan, LocalDate planDate) {
-        this.studyPlan = studyPlan;
-        this.planDate = planDate;
-    }
+    private Timestamp createdAt;
 }

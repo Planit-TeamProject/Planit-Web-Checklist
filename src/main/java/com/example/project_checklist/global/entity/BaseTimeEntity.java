@@ -1,28 +1,10 @@
 package com.example.project_checklist.global.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.MappedSuperclass;
-import java.time.LocalDateTime;
-import lombok.Getter;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-/**
- * 공통 설계 규칙(작성안내) 기준 공통 컬럼: created_at / updated_at.
- * 모든 도메인 엔티티가 이 클래스를 상속받아 사용합니다.
+/*
+ * REMOVED: MySQL/JPA -> Firestore 전환하면서 더 이상 쓰지 않습니다.
+ * (JPA의 @MappedSuperclass/@CreatedDate 는 Firestore 엔티티에 적용할 수 없어서,
+ *  각 Firestore 문서 클래스가 createdAt/updatedAt 을 직접 필드로 들고 있습니다.)
+ *
+ * 이 세션 환경에서는 파일을 완전히 삭제할 권한이 없어서 내용만 비워뒀습니다.
+ * 프로젝트에서 이 파일(BaseTimeEntity.java) 자체를 지우셔도 됩니다.
  */
-@Getter
-@MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
-public abstract class BaseTimeEntity {
-
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-}
